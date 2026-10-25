@@ -55,7 +55,7 @@ end;
 procedure JsonPathVariableIsEmptyAndWarned;
 var F: TGeneratedFileArray; W: Integer;
 begin
-  F := Convert('@t = {{$jsonpath ''a.b''}}', W);
+  F := Convert(Lines(['@t = {{login.response.body.$.id}}', '# @name login', 'GET http://x']), W);
   AssertTrue(Pos('"value": ""', F[1].Content) > 0);
   AssertEqualsInt(1, W);
 end;

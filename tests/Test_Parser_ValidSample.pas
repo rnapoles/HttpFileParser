@@ -10,14 +10,14 @@ begin
     '@baseUrl = http://localhost:8443',
     '@apiUrl = {{baseUrl}}/api/v1',
     '',
-    '@authToken = {{$jsonpath ''loginRequest.response.body.$.payload.accessToken''}}',
-    '@refreshToken = {{$jsonpath ''loginRequest.response.body.$.payload.refreshToken''}}',
-    '@sessionId = {{$jsonpath ''loginRequest.response.body.$.payload.sessionId''}}',
-    '@csrfToken = {{$jsonpath ''loginCookie.response.body.$.payload.csrfToken''}}',
+    '@authToken = {{loginRequest.response.body.$.payload.accessToken}}',
+    '@refreshToken = {{loginRequest.response.body.$.payload.refreshToken}}',
+    '@sessionId = {{loginRequest.response.body.$.payload.sessionId}}',
+    '@csrfToken = {{loginCookie.response.body.$.payload.csrfToken}}',
     '',
-    '@userId = {{$jsonpath ''createUser.response.body.$.payload.id''}}',
-    '@certificateId = {{$jsonpath ''createCertificate.response.body.$.payload.id''}}',
-    '@eventId = {{$jsonpath ''listAuditEvents.response.body.$.payload.items[0].id''}}',
+    '@userId = {{createUser.response.body.$.payload.id}}',
+    '@certificateId = {{createCertificate.response.body.$.payload.id}}',
+    '@eventId = {{listAuditEvents.response.body.$.payload.items[0].id}}',
     '',
     '@publicOrigin = https://localhost:8443',
     '@contentType = application/json',
@@ -101,7 +101,7 @@ begin
   P := Parse;
   try
     AssertEqualsStr('http://localhost:8443/api/v1', P.HttpFile.FindVariable('apiUrl').Value);
-    AssertEqualsStr('{{$jsonpath ''loginRequest.response.body.$.payload.accessToken''}}',
+    AssertEqualsStr('{{loginRequest.response.body.$.payload.accessToken}}',
       P.HttpFile.FindVariable('authToken').Value);
   finally P.Free; end;
 end;

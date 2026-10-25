@@ -13,7 +13,6 @@
 unit HttpFileFunctions;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}
-{$H+}{$X+}
 
 interface
 
@@ -218,11 +217,6 @@ begin
       'Unknown offset unit "%s" (use ms, s, m, h, d, w, M or y)', [AUnit]);
 end;
 
-function FnEmpty(const Args: THttpArgs; Context: THttpFunctionContext): string;
-begin
-  Result := ''; // $jsonpath / $xpath are not evaluated yet
-end;
-
 function FnGuid(const Args: THttpArgs; Context: THttpFunctionContext): string;
 const
   Hex = '0123456789abcdef';
@@ -321,8 +315,6 @@ end;
 
 procedure THttpFunctionRegistry.RegisterBuiltIns;
 begin
-  RegisterFunction('jsonpath', FnEmpty, 1, -1);
-  RegisterFunction('xpath', FnEmpty, 1, -1);
   RegisterFunction('guid', FnGuid, 0, 0);
   RegisterFunction('dotenv', FnDotEnv, 1, 1);
   RegisterFunction('randomInt', FnRandomInt, 2, 2);

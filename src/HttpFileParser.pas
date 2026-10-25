@@ -25,13 +25,12 @@
 unit HttpFileParser;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}
-{$H+}{$X+}
 
 interface
 
 uses
   SysUtils, Classes, HttpFileLexer, HttpFileAST, HttpFileFunctions,
-  HttpFileInterpolator;
+  HttpFileInterpolator, HttpFileResponses, HttpFileScripting;
 
 type
   THttpFileParser = class
@@ -44,6 +43,8 @@ type
     FErrors: THttpParseErrorList;
     FFunctions: THttpFunctionRegistry;
     FContext: THttpFunctionContext;
+    FResponses: THttpResponseStore;
+    FObjects: TScriptObjectRegistry;
     FParsed: Boolean;
     FPendingName: string;
     FPendingTitle: string;
@@ -82,6 +83,12 @@ type
     { register custom functions here before parsing }
     property Functions: THttpFunctionRegistry read FFunctions;
     property Context: THttpFunctionContext read FContext;
+    { responses of executed requests: fill them, call Parse again, and the
+      response references (name.response.headers.X, name.response.body.$.id)
+      are replaced }
+    property Responses: THttpResponseStore read FResponses;
+    { objects readable from expressions (RTTI): Scripting.RegisterObject('app', Obj) }
+    property Scripting: TScriptObjectRegistry read FObjects;
     { directory of the .env file used by $dotenv }
     property BaseDirectory: string read GetBaseDirectory write SetBaseDirectory;
   end;
@@ -106,6 +113,8 @@ begin
   FErrors := THttpParseErrorList.Create;
   FFunctions := THttpFunctionRegistry.Create(True);
   FContext := THttpFunctionContext.Create;
+  FResponses := THttpResponseStore.Create;
+  FObjects := TScriptObjectRegistry.Create;
 end;
 
 constructor THttpFileParser.CreateFromFile(const AFileName: string);
@@ -130,6 +139,8 @@ destructor THttpFileParser.Destroy;
 begin
   FLexer.Free;
   FFile.Free;
+  FObjects.Free;
+  FResponses.Free;
   FContext.Free;
   FFunctions.Free;
   FErrors.Free;
@@ -181,7 +192,8 @@ procedure THttpFileParser.Resolve;
 var
   Interpolator: THttpInterpolator;
 begin
-  Interpolator := THttpInterpolator.Create(FFile, FFunctions, FContext, FErrors);
+  Interpolator := THttpInterpolator.Create(FFile, FFunctions, FContext, FErrors,
+    FResponses, FObjects);
   try
     Interpolator.Apply;
   finally

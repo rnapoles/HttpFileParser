@@ -4,7 +4,6 @@
 unit HttpFileDateFormat;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}
-{$H+}{$X+}
 
 interface
 

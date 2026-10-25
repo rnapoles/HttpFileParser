@@ -33,7 +33,7 @@ type
   TVariable = class(THttpNode)
   public
     Name: string;
-    Value: string;      // variables replaced, functions called; $jsonpath/$xpath kept raw
+    Value: string;      // variables, functions, references and objects replaced; unresolved response references stay raw
     RawValue: string;
     ValueColumn: Integer;
   end;

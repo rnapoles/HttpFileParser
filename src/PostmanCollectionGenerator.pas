@@ -7,23 +7,23 @@
   them from the environment); the environment is built from the file's
   variables. {{$guid}} / {{$timestamp}} / {{$randomInt}} map to Postman dynamic
   variables; other functions are kept as written and reported as warnings.
-  Variables that depend on another response ($jsonpath/$xpath) get an empty
+  Variables that depend on another response (name.response...) get an empty
   environment value. *)
 unit PostmanCollectionGenerator;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}
-{$H+}{$X+}
 
 interface
 
 uses
-  SysUtils, StrUtils, HttpFileAST, CodeGenerator, JsonWriter;
+  SysUtils, StrUtils, HttpFileAST, HttpFileReferences, CodeGenerator, JsonWriter;
 
 type
   TPostmanCollectionGenerator = class(TCodeGenerator)
   private
     FCollectionName: string;
     FEnvironmentName: string;
+    FHttpFile: THttpFile;
     function Translate(const AText, AContext: string): string;
     function TranslateExpression(const AInner, ARaw, AContext: string): string;
     function BodyLanguage(AEndpoint: TEndpoint): string;
@@ -63,13 +63,21 @@ end;
 function TPostmanCollectionGenerator.TranslateExpression(const AInner, ARaw,
   AContext: string): string;
 var
-  FnName: string;
+  FnName, Msg: string;
   P: Integer;
   HasArgs: Boolean;
+  Ref: TRequestReference;
 begin
   Result := ARaw;
-  if (AInner = '') or (AInner[1] <> '$') then
-    Exit; // plain variable: Postman resolves it from the environment
+  if AInner = '' then
+    Exit;
+  if AInner[1] <> '$' then
+  begin
+    // plain variable: Postman resolves it from the environment
+    if (MatchRequestReference(FHttpFile, AInner, Ref, Msg) = rmValid) and (Ref.Scope = rsResponse) then
+      AddWarning(AContext + ': needs a Postman test script to read another response: ' + ARaw);
+    Exit;
+  end;
   FnName := LowerCase(Copy(AInner, 2, MaxInt));
   P := Pos(' ', FnName);
   HasArgs := P > 0;
@@ -85,8 +93,6 @@ begin
     Result := '{{$randomInt}}';
     AddWarning(AContext + ': Postman $randomInt ignores the range (0-1000): ' + ARaw);
   end
-  else if (FnName = 'jsonpath') or (FnName = 'xpath') then
-    AddWarning(AContext + ': needs a Postman test script to read another response: ' + ARaw)
   else
     AddWarning(AContext + ': no Postman equivalent, kept as written: ' + ARaw);
 end;
@@ -253,7 +259,7 @@ begin
       if AHttpFile.FindVariable(V.Name) <> V then
         Continue; // redefined later: the last definition wins
       Value := V.Value;
-      if Pos('{{$', Value) > 0 then
+      if (Pos('{{$', Value) > 0) or HasRequestReference(AHttpFile, Value) then
       begin
         AddWarning(Format('Variable "%s" (line %d) depends on a dynamic value, environment value left empty',
           [V.Name, V.Row]));
@@ -281,6 +287,7 @@ function TPostmanCollectionGenerator.DoGenerate(AHttpFile: THttpFile;
 var
   CollectionTitle, EnvironmentTitle: string;
 begin
+  FHttpFile := AHttpFile;
   CollectionTitle := FCollectionName;
   if CollectionTitle = '' then
     CollectionTitle := ABaseName;

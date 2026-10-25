@@ -16,8 +16,9 @@
 
   A URL, header or body that contains a function call ($guid, $datetime, ...)
   keeps its evaluated, inlined text, because the value cannot be rebuilt from
-  a shell variable. Variables that depend on another response ($jsonpath,
-  $xpath) are exported empty and reported as warnings.
+  a shell variable (same for references like name.response.body...).
+  Variables that depend on another response are exported empty and reported
+  as warnings.
 
   Windows limitation: cmd cannot hold a line break inside an argument, so a
   multi-line body is saved next to the script as <base>_body_<n>.txt and sent
@@ -26,12 +27,11 @@
 unit CurlGenerator;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}
-{$H+}{$X+}
 
 interface
 
 uses
-  SysUtils, Classes, StrUtils, HttpFileAST, CodeGenerator;
+  SysUtils, Classes, StrUtils, HttpFileAST, HttpFileReferences, CodeGenerator;
 
 type
   TCurlTarget = (ctPosixShell, ctWindowsBatch);
@@ -388,7 +388,8 @@ function TCurlGenerator.ValueSegments(AEndpoint: TEndpoint; const AWhere, ARaw,
 var
   I: Integer;
 begin
-  if FExportVariables and (Pos('{{$', ARaw) = 0) then
+  if FExportVariables and (Pos('{{$', ARaw) = 0) and
+     not HasRequestReference(FHttpFile, ARaw) then
     Result := SplitTemplate(ARaw)
   else
   begin
@@ -427,7 +428,7 @@ begin
     if FHttpFile.FindVariable(V.Name) <> V then
       Continue; // redefined later: the last definition wins
     Value := V.Value;
-    if Pos('{{$', Value) > 0 then
+    if (Pos('{{$', Value) > 0) or HasRequestReference(FHttpFile, Value) then
     begin
       AddWarning(Format('Variable "%s" (line %d) depends on a dynamic value, exported empty',
         [V.Name, V.Row]));
