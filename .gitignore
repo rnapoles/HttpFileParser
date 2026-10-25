@@ -84,3 +84,4 @@ __recovery/
 # Custom
 build/out/
 
+/sample.*

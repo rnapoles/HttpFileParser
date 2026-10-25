@@ -62,7 +62,7 @@ begin
 
   if Generator is TCurlGenerator then
   begin
-    TCurlGenerator(Generator).Target := ctWindowsBatch;
+    //TCurlGenerator(Generator).Target := ctWindowsBatch;
     TCurlGenerator(Generator).ExportVariables := True;
   end;
   
