@@ -7,8 +7,7 @@ uses SysUtils, MiniTest, TestHelpers, HttpFileParser, HttpFileAST, CodeGenerator
 const
   Header = '@echo off'#13#10#13#10;
 
-function Convert(const ASource: string; AMultiline, AComments: Boolean;
-  out AWarnings: Integer): TGeneratedFile;
+function Convert(const ASource: string; AMultiline, AComments: Boolean): TGeneratedFileArray;
 var P: THttpFileParser; G: TCurlGenerator;
 begin
   P := NewParser(ASource);
@@ -17,17 +16,16 @@ begin
     G.Target := ctWindowsBatch;
     G.Multiline := AMultiline;
     G.IncludeComments := AComments;
-    Result := G.Generate(P.HttpFile)[0];
-    AWarnings := G.Warnings.Count;
+    Result := G.Generate(P.HttpFile);
   finally G.Free; P.Free; end;
 end;
 
 procedure UsesBatExtensionAndPreamble;
-var W: Integer; F: TGeneratedFile;
+var F: TGeneratedFileArray;
 begin
-  F := Convert('GET http://x/a', False, False, W);
-  AssertEqualsStr('requests.bat', F.FileName);
-  AssertEqualsStr(Header + 'curl "http://x/a"'#13#10, F.Content);
+  F := Convert('GET http://x/a', False, False);
+  AssertEqualsStr('requests.bat', F[0].FileName);
+  AssertEqualsStr(Header + 'curl "http://x/a"'#13#10, F[0].Content);
 end;
 
 procedure DefaultTargetIsShell;
@@ -39,10 +37,9 @@ begin
 end;
 
 procedure MultilineUsesCaretAndCrLf;
-var W: Integer;
 begin
   AssertEqualsStr(Header + 'curl ^'#13#10'  -X DELETE ^'#13#10'  "http://x"'#13#10,
-    Convert('DELETE http://x', True, False, W).Content);
+    Convert('DELETE http://x', True, False)[0].Content);
 end;
 
 procedure QuoteEscapesQuotesAndPercent;
@@ -50,18 +47,35 @@ begin
   AssertEqualsStr('"a""b%%c"', BatchQuote('a"b%c'));
 end;
 
-procedure MultilineBodyIsFlattenedWithWarning;
-var W: Integer; F: TGeneratedFile;
+procedure SingleLineBodyStaysInline;
+var F: TGeneratedFileArray;
 begin
-  F := Convert(Lines(['POST http://x', '', '{', '"a":1', '}']), False, False, W);
-  AssertTrue(Pos('--data-raw "{ ""a"":1 }"', F.Content) > 0);
-  AssertEqualsInt(1, W);
+  F := Convert(Lines(['POST http://x', '', '{"a":1}']), False, False);
+  AssertEqualsInt(1, Length(F));
+  AssertTrue(Pos('--data-raw "{""a"":1}"', F[0].Content) > 0);
+end;
+
+procedure MultilineBodyIsSavedToFile;
+var F: TGeneratedFileArray;
+begin
+  F := Convert(Lines(['POST http://x', '', '{', '"a":1', '}']), False, False);
+  AssertEqualsInt(2, Length(F));
+  AssertTrue(Pos('--data-binary "@%~dp0requests_body_1.txt"', F[0].Content) > 0);
+  AssertEqualsStr('requests_body_1.txt', F[1].FileName);
+  AssertEqualsStr('{'#10'"a":1'#10'}', F[1].Content);
+end;
+
+procedure BodyFilesAreNumberedByEndpoint;
+var F: TGeneratedFileArray;
+begin
+  F := Convert(Lines(['GET http://a', '', 'POST http://b', '', 'x', 'y']), False, False);
+  AssertEqualsInt(2, Length(F));
+  AssertEqualsStr('requests_body_2.txt', F[1].FileName);
 end;
 
 procedure CommentsUseRem;
-var W: Integer;
 begin
-  AssertTrue(Pos('REM one'#13#10, Convert(Lines(['# @name one', 'GET http://x']), False, True, W).Content) > 0);
+  AssertTrue(Pos('REM one'#13#10, Convert(Lines(['# @name one', 'GET http://x']), False, True)[0].Content) > 0);
 end;
 
 procedure CurlBatIdSelectsBatchTarget;
@@ -77,7 +91,9 @@ initialization
   RegisterTest('Generator.CurlBatch', 'default target is the .sh shell', DefaultTargetIsShell);
   RegisterTest('Generator.CurlBatch', 'multiline uses ^ and CRLF', MultilineUsesCaretAndCrLf);
   RegisterTest('Generator.CurlBatch', 'quote escapes quotes and percent', QuoteEscapesQuotesAndPercent);
-  RegisterTest('Generator.CurlBatch', 'multi-line body is flattened with warning', MultilineBodyIsFlattenedWithWarning);
+  RegisterTest('Generator.CurlBatch', 'single-line body stays inline', SingleLineBodyStaysInline);
+  RegisterTest('Generator.CurlBatch', 'multi-line body is saved to a file', MultilineBodyIsSavedToFile);
+  RegisterTest('Generator.CurlBatch', 'body files are numbered by endpoint', BodyFilesAreNumberedByEndpoint);
   RegisterTest('Generator.CurlBatch', 'comments use REM', CommentsUseRem);
   RegisterTest('Generator.CurlBatch', 'curl-bat id selects batch target', CurlBatIdSelectsBatchTarget);
 end.

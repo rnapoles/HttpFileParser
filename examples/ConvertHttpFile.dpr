@@ -59,6 +59,13 @@ begin
 
   Parser := THttpFileParser.CreateFromFile(ParamStr(1));
   Generator := CreateCodeGenerator(ParamStr(2));
+
+  if Generator is TCurlGenerator then
+  begin
+    TCurlGenerator(Generator).Target := ctWindowsBatch;
+    TCurlGenerator(Generator).ExportVariables := True;
+  end;
+  
   try
     for I := 0 to Parser.Errors.Count - 1 do
       WriteLn('parse error: ', FormatParseError(Parser.Errors[I]));

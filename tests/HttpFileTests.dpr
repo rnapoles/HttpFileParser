@@ -37,6 +37,7 @@ uses
   Test_Generator_Registry,
   Test_Generator_Curl,
   Test_Generator_CurlBatch,
+  Test_Generator_CurlVariables,
   Test_Generator_Postman;
 
 begin

@@ -30,7 +30,7 @@ Dump an `.http` file (sample program):
 | Unit | Responsibility |
 |---|---|
 | `CodeGenerator` | `TCodeGenerator` base (template method `Generate` -> `DoGenerate`), warnings, generator registry, `SaveGeneratedFiles` |
-| `CurlGenerator` | `TCurlGenerator` (`curl`, `.sh` by default; `Target := ctWindowsBatch` or id `curl-bat` for `.bat`) via pluggable `TCurlDialect` |
+| `CurlGenerator` | `TCurlGenerator` (`curl`, `.sh` by default; `Target := ctWindowsBatch` or id `curl-bat` for `.bat`; `ExportVariables`) via pluggable `TCurlDialect` |
 | `PostmanCollectionGenerator` | `TPostmanCollectionGenerator` (`postman`): collection v2.1 + environment |
 | `JsonWriter` | dependency-free JSON writer used by the Postman generator |
 
