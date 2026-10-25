@@ -3,6 +3,7 @@
 unit JsonWriter;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}
+{$H+}{$X+}
 
 interface
 

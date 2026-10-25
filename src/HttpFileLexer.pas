@@ -8,6 +8,7 @@
 unit HttpFileLexer;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}
+{$H+}{$X+}
 
 interface
 
@@ -123,16 +124,16 @@ begin
     end;
 end;
 
-procedure InitToken(var AToken: THttpToken);
+function EmptyToken: THttpToken;
 begin
-  AToken.Kind := tkText;
-  AToken.Row := 0;
-  AToken.Col := 0;
-  AToken.Raw := '';
-  AToken.Name := '';
-  AToken.Value := '';
-  AToken.Version := '';
-  AToken.ValueCol := 0;
+  Result.Kind := tkText;
+  Result.Row := 0;
+  Result.Col := 0;
+  Result.Raw := '';
+  Result.Name := '';
+  Result.Value := '';
+  Result.Version := '';
+  Result.ValueCol := 0;
 end;
 
 { THttpFileLexer }
@@ -266,7 +267,7 @@ var
   LineStart: Integer;
   Indented: Boolean;
 begin
-  InitToken(Result);
+  Result := EmptyToken;
   if AtEnd then
   begin
     Result.Kind := tkEOF;

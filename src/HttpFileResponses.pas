@@ -1,17 +1,21 @@
 (* HttpFileResponses - responses of already executed requests, by request name.
 
-  The parser never executes requests. The HTTP client stores each response
-  here (Parser.Responses.Put('login')...) and parses again; expressions such
-  as login.response.headers.X-AuthToken inside double braces are then
-  replaced by the stored values. *)
+  The parser never executes requests. An executor (HttpFileExecutor) or a
+  loader (HttpFileResponseParser) stores each response here, the file is
+  parsed again, and
+  - expressions such as login.response.headers.X-AuthToken are replaced by the
+    stored values
+  - the endpoint with that name gets ResponseStatusCode, ResponseBody and
+    ResponseHeaders (BindResponsesToEndpoints). *)
 unit HttpFileResponses;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}
+{$H+}{$X+}
 
 interface
 
 uses
-  SysUtils, Classes;
+  SysUtils, Classes, HttpFileAST;
 
 type
   THttpHeaderEntry = record
@@ -19,14 +23,20 @@ type
     Value: string;
   end;
 
+  THttpHeaderArray = array of THttpHeaderEntry;
+
   THttpResponse = class
   private
-    FHeaders: array of THttpHeaderEntry;
+    FHeaders: THttpHeaderArray;
     function GetHeaderCount: Integer;
     function GetHeader(AIndex: Integer): THttpHeaderEntry;
   public
+    HttpVersion: string;  // e.g. HTTP/1.1
     StatusCode: Integer;
+    StatusText: string;
     Body: string;
+    procedure Clear;
+    procedure Assign(ASource: THttpResponse);
     procedure AddHeader(const AName, AValue: string);
     { header names are case-insensitive; the first match wins }
     function FindHeader(const AName: string; out AValue: string): Boolean;
@@ -46,6 +56,9 @@ type
     procedure Clear;
   end;
 
+{ copies the stored response of every named endpoint into the endpoint }
+procedure BindResponsesToEndpoints(AFile: THttpFile; AStore: THttpResponseStore);
+
 implementation
 
 { THttpResponse }
@@ -58,6 +71,28 @@ end;
 function THttpResponse.GetHeader(AIndex: Integer): THttpHeaderEntry;
 begin
   Result := FHeaders[AIndex];
+end;
+
+procedure THttpResponse.Clear;
+begin
+  HttpVersion := '';
+  StatusCode := 0;
+  StatusText := '';
+  Body := '';
+  FHeaders := nil;
+end;
+
+procedure THttpResponse.Assign(ASource: THttpResponse);
+var
+  I: Integer;
+begin
+  Clear;
+  HttpVersion := ASource.HttpVersion;
+  StatusCode := ASource.StatusCode;
+  StatusText := ASource.StatusText;
+  Body := ASource.Body;
+  for I := 0 to ASource.HeaderCount - 1 do
+    AddHeader(ASource.Headers[I].Name, ASource.Headers[I].Value);
 end;
 
 procedure THttpResponse.AddHeader(const AName, AValue: string);
@@ -123,6 +158,34 @@ end;
 procedure THttpResponseStore.Clear;
 begin
   FResponses.Clear;
+end;
+
+procedure BindResponsesToEndpoints(AFile: THttpFile; AStore: THttpResponseStore);
+var
+  I, J: Integer;
+  Endpoint: TEndpoint;
+  Response: THttpResponse;
+  Header: TResponseHeader;
+begin
+  for I := 0 to High(AFile.Endpoints) do
+  begin
+    Endpoint := AFile.Endpoints[I];
+    if Endpoint.Name = '' then
+      Continue;
+    Response := AStore.Find(Endpoint.Name);
+    if Response = nil then
+      Continue;
+    Endpoint.ResponseStatusCode := Response.StatusCode;
+    Endpoint.ResponseStatusText := Response.StatusText;
+    Endpoint.ResponseBody := Response.Body;
+    for J := 0 to Response.HeaderCount - 1 do
+    begin
+      Header := Endpoint.AddResponseHeader;
+      Header.Name := Response.Headers[J].Name;
+      Header.Value := Response.Headers[J].Value;
+      Header.RawValue := Response.Headers[J].Value;
+    end;
+  end;
 end;
 
 end.

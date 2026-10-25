@@ -27,6 +27,7 @@
 unit CurlGenerator;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}
+{$H+}{$X+}
 
 interface
 
@@ -351,14 +352,14 @@ begin
   Result := (AEndpoint.BodyFilePath <> '') or (AEndpoint.RequestBody <> '');
 end;
 
-(* templates: {{variable}} -> shell variable reference *)
+// templates: variable references in double braces become shell variable references
 
 function TCurlGenerator.SplitTemplate(const ARaw: string): TCurlTemplateSegmentArray;
 var
   I, CloseAt, RunStart: Integer;
   Inner: string;
 begin
-  SetLength(Result, 0);
+  Result := nil;
   I := 1;
   RunStart := 1;
   while I <= Length(ARaw) do
@@ -393,7 +394,7 @@ begin
     Result := SplitTemplate(ARaw)
   else
   begin
-    SetLength(Result, 0);
+    Result := nil;
     AppendSegment(Result, False, AResolved);
   end;
   for I := 0 to High(Result) do
@@ -544,6 +545,7 @@ var
   I: Integer;
   Text: string;
 begin
+  Result := nil;
   FHttpFile := AHttpFile;
   FBaseName := ABaseName;
   SetLength(FExtraFiles, 0);

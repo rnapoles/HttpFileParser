@@ -4,7 +4,7 @@
   Usage:  DumpHttpFile <file.http> [--demo]
   --demo  registers the object "app" and a stored response for the request
           "login" so the expressions of examples/features.http are resolved
-  Exit code: 0 = parsed cleanly, 1 = parse errors, 2 = usage / I/O error }
+  Exit code: 0 = no errors (warnings allowed), 1 = parse errors, 2 = usage / I/O error }
 program DumpHttpFile;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}
@@ -115,7 +115,7 @@ procedure DumpErrors(AErrors: THttpParseErrorList);
 var
   I: Integer;
 begin
-  WriteLn('PARSE ERRORS (', AErrors.Count, ')');
+  WriteLn(Format('DIAGNOSTICS (%d errors, %d warnings)', [AErrors.ErrorCount, AErrors.WarningCount]));
   for I := 0 to AErrors.Count - 1 do
     WriteLn('  ', FormatParseError(AErrors[I]));
 end;
@@ -152,8 +152,8 @@ begin
     for I := 0 to High(Parser.HttpFile.Endpoints) do
       DumpEndpoint(I, Parser.HttpFile.Endpoints[I]);
     DumpErrors(Parser.Errors);
-    if Parser.Errors.Count > 0 then
-      ExitCode := 1;
+    if Parser.Errors.HasErrors then
+      ExitCode := 1; // warnings do not fail the run
   finally
     Parser.Free;
     If Assigned(Demo) then FreeAndNil(Demo);

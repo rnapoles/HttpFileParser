@@ -13,6 +13,7 @@
 unit HttpFileScripting;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}
+{$H+}{$X+}
 
 interface
 
@@ -92,8 +93,8 @@ begin
     tkFloat: Result := FloatToStr(GetFloatProp(AObject, APropInfo), InvariantSettings);
     {$IFDEF FPC}
     tkSString, tkLString, tkAString: Result := GetStrProp(AObject, APropInfo);
-    tkWString: Result := GetWideStrProp(AObject, APropInfo);
-    tkUString: Result := GetUnicodeStrProp(AObject, APropInfo);
+    tkWString: Result := string(UTF8Encode(GetWideStrProp(AObject, APropInfo)));
+    tkUString: Result := string(UTF8Encode(GetUnicodeStrProp(AObject, APropInfo)));
     tkBool:
       if GetOrdProp(AObject, APropInfo) <> 0 then
         Result := 'True'

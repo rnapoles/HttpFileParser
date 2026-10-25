@@ -19,7 +19,8 @@ begin
   P := NewParser(Lines(['@a = {{host}}/x']));
   try
     AssertEqualsStr('{{host}}/x', P.HttpFile.Variables[0].Value);
-    AssertEqualsInt(0, P.Errors.Count);
+    AssertEqualsInt(0, P.Errors.ErrorCount);
+    AssertEqualsInt(1, P.Errors.WarningCount);
   finally P.Free; end;
 end;
 

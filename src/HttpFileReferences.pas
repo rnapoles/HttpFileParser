@@ -12,6 +12,7 @@
 unit HttpFileReferences;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}
+{$H+}{$X+}
 
 interface
 

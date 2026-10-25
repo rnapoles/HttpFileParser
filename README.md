@@ -11,6 +11,10 @@ Zero-dependency parser for `.http` / `.rest` files. Delphi 12+ and Free Pascal 3
 | `HttpFileFunctions` | function registry + `$guid $dotenv $randomInt $timestamp $datetime $localDatetime` |
 | `HttpFileReferences` | syntax of `requestName.(request\|response).(body\|headers).(* \| JSONPath \| Header Name)` |
 | `HttpFileResponses` | store of executed responses by request name |
+| `HttpFileResponseParser` | raw HTTP response parser (`THttpResponseParser`) and saved-responses loader (`THttpResponseFileLoader`) |
+| `HttpFileExecutor` | `IRequestExecutor` + abstract `TRequestExecutor` (check, build message, `DoSend`, store, re-parse); one subclass per transport |
+| `HttpFileResponseBuilder` | transport neutral collector: header lines + body chunks -> `THttpResponse` |
+| `CurlRequestExecutor` | `TCurlRequestExecutor` (libcurl through `src/libpascurl/libpascurl.pas`, GPL-3.0); needs libcurl at run time |
 | `HttpFileSelectors` | value extraction from bodies (`*` and JSONPath through `TJSONPath`; XPath not supported yet) |
 | `HttpFileScripting` | RTTI registry of object instances readable from expressions |
 | `jsonpath/` | the JSONPath units (`src/jsonpath`, add to the unit search path) |
@@ -57,3 +61,21 @@ a request: `Parser.Responses.Put('login')` (set `Body`, `AddHeader`), then `Pars
 Published properties are read through RTTI (Delphi: derive from `TPersistent` or use `{$M+}`).
 
 Feature tour: `examples/features.http` (run `DumpHttpFile examples/features.http --demo`).
+
+## Diagnostics
+
+`Parser.Errors` holds errors, warnings and info entries (`Severity`, start `Row/Column`, exclusive end
+`EndRow/EndColumn`, `Rule`). Use `ErrorCount`, `WarningCount`, `HasErrors`; `Count` is the total.
+Warnings: unresolved placeholders (`Placeholder`), skipped scripts (`Script`), `@name` without a name.
+
+## Executing requests
+
+Derive from `TRequestExecutor`, override `DoSend(const ARequest: THttpRequestMessage): THttpResponse`
+and call `Execute('login')`, `ExecuteAt(i)` or `ExecuteAll` through `IRequestExecutor`.
+Each response is stored in `Parser.Responses`, the file is parsed again, and later requests resolve
+`login.response...`. Saved responses (`### name` / `# @name`, status line, headers, blank line, body)
+load with `THttpResponseFileLoader.LoadFromFile(file, Parser.Responses)`.
+
+Run a file against real servers: `sh build/build_run_fpc.sh && build/out/RunHttpFile examples/features.http`
+(`TCurlRequestExecutor.Create(Parser)`; options `FollowRedirects`, `TimeoutSeconds`, `VerifyTls`, `UserAgent`).
+Note: `libpascurl.pas` is GPL-3.0; linking it makes the resulting program subject to that license.

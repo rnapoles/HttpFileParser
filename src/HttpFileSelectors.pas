@@ -11,6 +11,7 @@
 unit HttpFileSelectors;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}
+{$H+}{$X+}
 
 interface
 

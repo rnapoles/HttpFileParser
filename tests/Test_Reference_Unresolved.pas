@@ -21,7 +21,8 @@ begin
   P := NewParser(Lines(['@t = {{createUser.response.body.$.id}}']));
   try
     AssertEqualsStr('{{createUser.response.body.$.id}}', P.HttpFile.Variables[0].Value);
-    AssertEqualsInt(0, P.Errors.Count);
+    AssertEqualsInt(0, P.Errors.ErrorCount);
+    AssertEqualsInt(1, P.Errors.WarningCount);
   finally P.Free; end;
 end;
 

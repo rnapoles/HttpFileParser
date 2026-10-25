@@ -13,7 +13,7 @@ begin
   try
     P.Scripting.RegisterObject('person', Person);
     AValue := P.HttpFile.Variables[0].Value;
-    Result := P.Errors.Count;
+    Result := P.Errors.ErrorCount;
   finally P.Free; Person.Free; end;
 end;
 

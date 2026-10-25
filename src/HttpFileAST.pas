@@ -3,6 +3,7 @@
 unit HttpFileAST;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}
+{$H+}{$X+}
 
 interface
 
@@ -52,7 +53,9 @@ type
     RawUrl: string;
     RequestBody: string;      // empty when the body is a file reference
     RawRequestBody: string;
-    ResponseBody: string;     // never filled by the parser
+    ResponseBody: string;     // filled from the response store (name must match)
+    ResponseStatusCode: Integer; // 0 = no stored response
+    ResponseStatusText: string;
     BodyFilePath: string;     // set for "< path" bodies
     UrlColumn: Integer;
     BodyRow: Integer;
@@ -82,12 +85,17 @@ type
     property Endpoints: TEndpointArray read FEndpoints;
   end;
 
+  THttpSeverity = (hsError, hsWarning, hsInfo);
+
   THttpParseError = record
-    Row: Integer;
+    Severity: THttpSeverity;
+    Row: Integer;       // start, 1-based
     Column: Integer;
+    EndRow: Integer;    // end, 1-based, exclusive column (zero-width: equals the start)
+    EndColumn: Integer;
     Message: string;
-    Token: string;   // offending text
-    Rule: string;    // production rule that failed
+    Token: string;      // offending text
+    Rule: string;       // production rule or check that reported it
   end;
 
   THttpParseErrorList = class
@@ -95,11 +103,25 @@ type
     FItems: array of THttpParseError;
     FCount: Integer;
     function GetItem(AIndex: Integer): THttpParseError;
+    function GetErrorCount: Integer;
+    function GetWarningCount: Integer;
+    function GetInfoCount: Integer;
   public
-    procedure Add(ARow, AColumn: Integer; const AMessage, AToken, ARule: string);
+    { error; the range ends after AToken }
+    procedure Add(ARow, AColumn: Integer; const AMessage, AToken, ARule: string); overload;
+    { the range ends after AToken, which may span several lines }
+    procedure Add(ASeverity: THttpSeverity; ARow, AColumn: Integer;
+      const AMessage, AToken, ARule: string); overload;
+    procedure AddRange(ASeverity: THttpSeverity; ARow, AColumn, AEndRow, AEndColumn: Integer;
+      const AMessage, AToken, ARule: string);
     procedure Clear;
     procedure SortByPosition;
-    property Count: Integer read FCount;
+    function CountOf(ASeverity: THttpSeverity): Integer;
+    function HasErrors: Boolean;
+    property Count: Integer read FCount;      // every entry, whatever its severity
+    property ErrorCount: Integer read GetErrorCount;
+    property WarningCount: Integer read GetWarningCount;
+    property InfoCount: Integer read GetInfoCount;
     property Items[AIndex: Integer]: THttpParseError read GetItem; default;
   end;
 
@@ -109,11 +131,16 @@ type
     Column: Integer;
     Token: string;
     Rule: string;
+    EndRow: Integer;
+    EndColumn: Integer;
     constructor CreateAt(const AMessage: string; ARow, AColumn: Integer;
       const AToken, ARule: string);
   end;
 
 function FormatParseError(const AError: THttpParseError): string;
+function SeverityName(ASeverity: THttpSeverity): string;
+{ moves a position over AText (line breaks start a new row at column 1) }
+procedure AdvancePosition(var ARow, AColumn: Integer; const AText: string);
 
 implementation
 
@@ -224,17 +251,67 @@ begin
   Result := FItems[AIndex];
 end;
 
-procedure THttpParseErrorList.Add(ARow, AColumn: Integer;
-  const AMessage, AToken, ARule: string);
+procedure THttpParseErrorList.AddRange(ASeverity: THttpSeverity;
+  ARow, AColumn, AEndRow, AEndColumn: Integer; const AMessage, AToken, ARule: string);
 begin
   if FCount = Length(FItems) then
     SetLength(FItems, FCount * 2 + 8);
+  FItems[FCount].Severity := ASeverity;
   FItems[FCount].Row := ARow;
   FItems[FCount].Column := AColumn;
+  FItems[FCount].EndRow := AEndRow;
+  FItems[FCount].EndColumn := AEndColumn;
   FItems[FCount].Message := AMessage;
   FItems[FCount].Token := AToken;
   FItems[FCount].Rule := ARule;
   Inc(FCount);
+end;
+
+procedure THttpParseErrorList.Add(ASeverity: THttpSeverity; ARow, AColumn: Integer;
+  const AMessage, AToken, ARule: string);
+var
+  EndRow, EndColumn: Integer;
+begin
+  EndRow := ARow;
+  EndColumn := AColumn;
+  AdvancePosition(EndRow, EndColumn, AToken);
+  AddRange(ASeverity, ARow, AColumn, EndRow, EndColumn, AMessage, AToken, ARule);
+end;
+
+procedure THttpParseErrorList.Add(ARow, AColumn: Integer;
+  const AMessage, AToken, ARule: string);
+begin
+  Add(hsError, ARow, AColumn, AMessage, AToken, ARule);
+end;
+
+function THttpParseErrorList.CountOf(ASeverity: THttpSeverity): Integer;
+var
+  I: Integer;
+begin
+  Result := 0;
+  for I := 0 to FCount - 1 do
+    if FItems[I].Severity = ASeverity then
+      Inc(Result);
+end;
+
+function THttpParseErrorList.GetErrorCount: Integer;
+begin
+  Result := CountOf(hsError);
+end;
+
+function THttpParseErrorList.GetWarningCount: Integer;
+begin
+  Result := CountOf(hsWarning);
+end;
+
+function THttpParseErrorList.GetInfoCount: Integer;
+begin
+  Result := CountOf(hsInfo);
+end;
+
+function THttpParseErrorList.HasErrors: Boolean;
+begin
+  Result := CountOf(hsError) > 0;
 end;
 
 procedure THttpParseErrorList.Clear;
@@ -274,12 +351,51 @@ begin
   Column := AColumn;
   Token := AToken;
   Rule := ARule;
+  EndRow := ARow;
+  EndColumn := AColumn;
+  AdvancePosition(EndRow, EndColumn, AToken);
+end;
+
+function SeverityName(ASeverity: THttpSeverity): string;
+begin
+  case ASeverity of
+    hsError: Result := 'error';
+    hsWarning: Result := 'warning';
+  else
+    Result := 'info';
+  end;
+end;
+
+procedure AdvancePosition(var ARow, AColumn: Integer; const AText: string);
+var
+  I: Integer;
+begin
+  I := 1;
+  while I <= Length(AText) do
+  begin
+    if AText[I] = #13 then
+    begin
+      if (I < Length(AText)) and (AText[I + 1] = #10) then
+        Inc(I);
+      Inc(ARow);
+      AColumn := 1;
+    end
+    else if AText[I] = #10 then
+    begin
+      Inc(ARow);
+      AColumn := 1;
+    end
+    else
+      Inc(AColumn);
+    Inc(I);
+  end;
 end;
 
 function FormatParseError(const AError: THttpParseError): string;
 begin
-  Result := Format('%s (line %d, column %d, rule %s, near "%s")',
-    [AError.Message, AError.Row, AError.Column, AError.Rule, AError.Token]);
+  Result := Format('%s: %s (%d:%d-%d:%d, rule %s, near "%s")',
+    [SeverityName(AError.Severity), AError.Message, AError.Row, AError.Column,
+     AError.EndRow, AError.EndColumn, AError.Rule, AError.Token]);
 end;
 
 end.

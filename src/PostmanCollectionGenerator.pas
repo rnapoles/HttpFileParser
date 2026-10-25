@@ -12,6 +12,7 @@
 unit PostmanCollectionGenerator;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}
+{$H+}{$X+}
 
 interface
 
@@ -295,6 +296,7 @@ begin
   if EnvironmentTitle = '' then
     EnvironmentTitle := CollectionTitle + ' Environment';
 
+  Result := nil;
   SetLength(Result, 2);
   Result[0].FileName := ABaseName + '.postman_collection.json';
   Result[0].Content := BuildCollection(AHttpFile, CollectionTitle);

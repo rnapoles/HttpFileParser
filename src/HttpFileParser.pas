@@ -25,6 +25,7 @@
 unit HttpFileParser;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}
+{$H+}{$X+}
 
 interface
 
@@ -54,7 +55,8 @@ type
     procedure SetBaseDirectory(const AValue: string);
     { token handling }
     procedure Advance;
-    procedure AddError(ARow, ACol: Integer; const AMessage, AToken, ARule: string);
+    procedure Report(ASeverity: THttpSeverity; const AToken: THttpToken;
+      const AMessage, ARule: string);
     procedure Fail(const AMessage, ARule: string);
     function DescribeToken: string;
     procedure Synchronize(AStartIndex: Integer);
@@ -199,6 +201,7 @@ begin
   finally
     Interpolator.Free;
   end;
+  BindResponsesToEndpoints(FFile, FResponses);
 end;
 
 { token handling }
@@ -212,9 +215,14 @@ begin
   end;
 end;
 
-procedure THttpFileParser.AddError(ARow, ACol: Integer; const AMessage, AToken, ARule: string);
+procedure THttpFileParser.Report(ASeverity: THttpSeverity; const AToken: THttpToken;
+  const AMessage, ARule: string);
+var
+  Text: string;
 begin
-  FErrors.Add(ARow, ACol, AMessage, AToken, ARule);
+  Text := Trim(AToken.Raw);
+  FErrors.AddRange(ASeverity, AToken.Row, AToken.Col, AToken.Row,
+    AToken.Col + Length(Text), AMessage, Text, ARule);
 end;
 
 function THttpFileParser.DescribeToken: string;
@@ -225,9 +233,14 @@ begin
 end;
 
 procedure THttpFileParser.Fail(const AMessage, ARule: string);
+var
+  Error: EHttpFileParseException;
 begin
-  raise EHttpFileParseException.CreateAt(AMessage, FToken.Row, FToken.Col,
+  Error := EHttpFileParseException.CreateAt(AMessage, FToken.Row, FToken.Col,
     DescribeToken, ARule);
+  Error.EndRow := FToken.Row;
+  Error.EndColumn := FToken.Col + Length(Trim(FToken.Raw));
+  raise Error;
 end;
 
 procedure THttpFileParser.Synchronize(AStartIndex: Integer);
@@ -253,7 +266,8 @@ begin
     except
       on E: EHttpFileParseException do
       begin
-        AddError(E.Row, E.Column, E.Message, E.Token, E.Rule);
+        FErrors.AddRange(hsError, E.Row, E.Column, E.EndRow, E.EndColumn,
+          E.Message, E.Token, E.Rule);
         Synchronize(StartIndex);
       end;
     end;
@@ -284,8 +298,7 @@ end;
 procedure THttpFileParser.ParseMetaName;
 begin
   if FToken.Name = '' then
-    AddError(FToken.Row, FToken.Col, 'Missing request name after @name',
-      DescribeToken, 'MetaName')
+    Report(hsWarning, FToken, 'Missing request name after @name', 'MetaName')
   else
     FPendingName := FToken.Name;
   Advance;
@@ -306,13 +319,17 @@ end;
 function THttpFileParser.ParseEndpoint: TEndpoint;
 var
   Tok: THttpToken;
+  Error: EHttpFileParseException;
 begin
   Tok := FToken;
   if Tok.Value = '' then
   begin
     Advance;
-    raise EHttpFileParseException.CreateAt('Missing URL in request line',
+    Error := EHttpFileParseException.CreateAt('Missing URL in request line',
       Tok.Row, Tok.Col + Length(Tok.Name), Trim(Tok.Raw), 'RequestLine');
+    Error.EndRow := Error.Row;       // zero-width: the URL is missing here
+    Error.EndColumn := Error.Column;
+    raise Error;
   end;
   Result := TEndpoint.Create;
   FFile.AddEndpoint(Result);
@@ -368,9 +385,9 @@ begin
       tkEOF, tkSeparator, tkMetaName, tkVariableDecl, tkRequestLine:
         Exit;
     else
-      AddError(FToken.Row, FToken.Col,
+      Report(hsError, FToken,
         'Expected a header ("Name: value") or a blank line, found "' +
-        DescribeToken + '"', DescribeToken, 'HeaderLine');
+        DescribeToken + '"', 'HeaderLine');
       Advance;
     end;
 end;
@@ -394,6 +411,7 @@ var
   PrevSoft, Done: Boolean;
   Joined: string;
 begin
+  Lines := nil;
   Count := 0;
   PrevSoft := True;
   Done := False;
@@ -453,8 +471,8 @@ var
   Closed: Boolean;
   OpenAt: Integer;
 begin
-  AddError(FToken.Row, FToken.Col,
-    'Request/response scripts are not supported', DescribeToken, 'Script');
+  Report(hsWarning, FToken,
+    'Request/response scripts are not supported (skipped)', 'Script');
   OpenAt := Pos('{%', FToken.Raw);
   Closed := Pos('%}', Copy(FToken.Raw, OpenAt + 2, MaxInt)) > 0;
   Advance;

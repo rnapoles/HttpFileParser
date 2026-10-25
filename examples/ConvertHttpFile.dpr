@@ -68,7 +68,7 @@ begin
   
   try
     for I := 0 to Parser.Errors.Count - 1 do
-      WriteLn('parse error: ', FormatParseError(Parser.Errors[I]));
+      WriteLn('diagnostic: ', FormatParseError(Parser.Errors[I]));
     Files := Generator.Generate(Parser.HttpFile, BaseName);
     SaveGeneratedFiles(Files, OutDir);
     for I := 0 to High(Files) do

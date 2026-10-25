@@ -12,11 +12,12 @@
                                              stored yet leaves the text as is
   4. object.Property[.Property] ............ registered object (RTTI)
   Anything else (request or environment variables of the HTTP client) is left
-  untouched. Problems are added to the error list and leave the expression
+  untouched and reported as a warning (rule Placeholder). Problems are added to the error list and leave the expression
   as written. Replacement is single pass: replaced text is never rescanned. *)
 unit HttpFileInterpolator;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}
+{$H+}{$X+}
 
 interface
 
@@ -292,6 +293,7 @@ function THttpInterpolator.EvaluateReference(const AInner, ARaw: string;
 var
   Ref: TRequestReference;
   Msg, Value: string;
+  Resolved: Boolean;
 begin
   Result := ARaw;
   case MatchRequestReference(FFile, AInner, Ref, Msg) of
@@ -314,14 +316,25 @@ begin
         end;
       end;
   else
-    if FObjects <> nil then
-      try
-        if FObjects.TryEvaluate(AInner, Value) then
-          Result := Value;
-      except
-        on E: EScriptError do
-          FErrors.Add(ARow, ACol, E.Message, ARaw, 'ScriptObject');
-      end;
+    begin
+      Resolved := False;
+      if FObjects <> nil then
+        try
+          Resolved := FObjects.TryEvaluate(AInner, Value);
+          if Resolved then
+            Result := Value;
+        except
+          on E: EScriptError do
+          begin
+            Resolved := True; // reported here as an error, not as a placeholder
+            FErrors.Add(ARow, ACol, E.Message, ARaw, 'ScriptObject');
+          end;
+        end;
+      if not Resolved then
+        FErrors.Add(hsWarning, ARow, ACol,
+          Format('Unresolved placeholder "%s", left as written', [AInner]),
+          ARaw, 'Placeholder');
+    end;
   end;
 end;
 

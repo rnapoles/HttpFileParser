@@ -84,12 +84,13 @@ begin
 end;
 
 procedure ParsesWithoutErrors;
-var P: THttpFileParser;
+var P: THttpFileParser; I: Integer;
 begin
   P := Parse;
   try
-    if P.Errors.Count > 0 then
-      AssertTrue(False, FormatParseError(P.Errors[0]));
+    for I := 0 to P.Errors.Count - 1 do
+      if P.Errors[I].Severity = hsError then
+        AssertTrue(False, FormatParseError(P.Errors[I]));
     AssertEqualsInt(15, Length(P.HttpFile.Variables));
     AssertEqualsInt(5, Length(P.HttpFile.Endpoints));
   finally P.Free; end;
