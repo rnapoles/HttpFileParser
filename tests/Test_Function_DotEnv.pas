@@ -12,7 +12,6 @@ var
   Env: TStringList;
   P: THttpFileParser;
 begin
-  WriteLn(Dir);
   ForceDirectories(Dir);
   Env := TStringList.Create;
   try
@@ -20,9 +19,7 @@ begin
     Env.Add('USERNAME=alice');
     Env.Add('export TOKEN="a b"');
     Env.SaveToFile(Dir + PathDelim + '.env');
-  finally
-    Env.Free;
-  end;
+  finally Env.Free; end;
   P := NewParser(Lines(['POST http://x', '', AExpr]));
   try
     P.BaseDirectory := Dir;

@@ -9,8 +9,7 @@
                         Unknown functions / bad arguments leave the expression
                         untouched and add an entry to the error list.
   * In variable values {{$jsonpath ...}} and {{$xpath ...}} are kept raw.
-  * Replacement is single pass: replaced text is never scanned again. 
-*)
+  * Replacement is single pass: replaced text is never scanned again. *)
 unit HttpFileInterpolator;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}

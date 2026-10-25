@@ -1,3 +1,27 @@
+(* HttpFileParser - recursive descent parser for .http files.
+
+  Grammar (one ParseXxx method per non-terminal; lines are the terminals):
+
+    HttpFile       = { Item } EOF ;
+    Item           = Blank | Comment | Separator | MetaName | VariableDecl
+                   | Endpoint | Script[error] ;
+    Separator      = "###" [ Title ] ;                 -- Title = default name
+    MetaName       = ("#" | "//") "@name" [ "=" ] Name ;
+    VariableDecl   = "@" Ident "=" Value ;
+    Endpoint       = RequestLine { QueryContinuation } Headers [ Body ] ;
+    RequestLine    = [ Verb ] Url [ "HTTP/" Version ] ;
+    Headers        = { HeaderLine | Comment | Script[error] } [ Blank ] ;
+    HeaderLine     = Name ":" Value ;
+    Body           = { BodyLine } | FileRef ;
+    FileRef        = "<" Path ;
+
+  A body ends at: "###", "# @name", a variable declaration, EOF, or a request
+  line that follows a blank/comment line. Trailing blank/comment lines and
+  leading blank lines are not part of the body. Line breaks inside bodies are
+  normalised to LF.
+
+  Scripts ("< {% ... %}", "> {% ... %}") are NOT supported: they are reported
+  as errors and skipped. *)
 unit HttpFileParser;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}

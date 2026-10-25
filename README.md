@@ -20,3 +20,20 @@ for E in P.HttpFile.Endpoints ... ; P.Errors[I].Row / .Column / .Message
 Build & run tests:
 
     sh build/build_fpc.sh        (or build\build_fpc.bat / build\build_delphi.bat)
+
+Dump an `.http` file (sample program):
+
+    sh build/build_dump_fpc.sh && build/out/DumpHttpFile examples/sample.http
+
+## Converters
+
+| Unit | Responsibility |
+|---|---|
+| `CodeGenerator` | `TCodeGenerator` base (template method `Generate` -> `DoGenerate`), warnings, generator registry, `SaveGeneratedFiles` |
+| `CurlGenerator` | `TCurlGenerator` (`curl`, `.sh` by default; `Target := ctWindowsBatch` or id `curl-bat` for `.bat`) via pluggable `TCurlDialect` |
+| `PostmanCollectionGenerator` | `TPostmanCollectionGenerator` (`postman`): collection v2.1 + environment |
+| `JsonWriter` | dependency-free JSON writer used by the Postman generator |
+
+Add a new target: derive from `TCodeGenerator`, override `Id`, `Description`, `DoGenerate`, and call `RegisterCodeGenerator` in `initialization`.
+
+    sh build/build_convert_fpc.sh && build/out/ConvertHttpFile examples/sample.http curl out

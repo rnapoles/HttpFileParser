@@ -32,7 +32,12 @@ uses
   Test_Function_CustomRegistration,
   Test_Function_Arguments,
   Test_Function_UnknownFunction,
-  Test_DateFormat_DayJs;
+  Test_DateFormat_DayJs,
+  Test_JsonWriter,
+  Test_Generator_Registry,
+  Test_Generator_Curl,
+  Test_Generator_CurlBatch,
+  Test_Generator_Postman;
 
 begin
   if RunAllTests > 0 then
