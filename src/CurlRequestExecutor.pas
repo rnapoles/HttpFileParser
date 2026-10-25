@@ -1,7 +1,7 @@
-(* CurlRequestExecutor - TRequestExecutor on top of libcurl (libpascurl.pas).
+(* CurlRequestExecutor - TRequestExecutor on top of libcurl (libcurl.pas).
 
   Needs libcurl at run time (libcurl.dll / libcurl.so / libcurl.dylib) and
-  libpascurl.pas (GPL-3.0, see its header) on the unit search path.
+  libcurl.pas on the unit search path.
 
   Mapping of a THttpRequestMessage:
     method   GET: default, HEAD: NOBODY, others: CUSTOMREQUEST
@@ -20,7 +20,7 @@ unit CurlRequestExecutor;
 interface
 
 uses
-  SysUtils, libpascurl, HttpFileResponses, HttpFileResponseParser,
+  SysUtils, libcurl, HttpFileResponses, HttpFileResponseParser,
   HttpFileResponseBuilder, HttpFileParser, HttpFileExecutor;
 
 type
@@ -96,7 +96,7 @@ end;
 type
   TCurlEasy = class
   private
-    FHandle: CURL;
+    FHandle: PCURL;
     FHeaderList: pcurl_slist;
     FErrorBuffer: array[0..CURL_ERROR_SIZE] of AnsiChar;
     procedure Check(ACode: CURLcode);
