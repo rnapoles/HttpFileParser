@@ -49,10 +49,24 @@ begin
     Result := 'Body selector must be * or a JSONPath starting with $';
 end;
 
+{ length of "request" / "response" right after the dot at APos, 0 when it is
+  not followed by a dot or the end of the text }
+function ScopeWordLength(const ALower: string; APos: Integer): Integer;
+begin
+  Result := 0;
+  if Copy(ALower, APos + 1, 7) = 'request' then
+    Result := 7
+  else if Copy(ALower, APos + 1, 8) = 'response' then
+    Result := 8;
+  if (Result > 0) and (APos + Result < Length(ALower)) and
+     (ALower[APos + Result + 1] <> '.') then
+    Result := 0;
+end;
+
 function MatchRequestReference(AFile: THttpFile; const AInner: string;
   out ARef: TRequestReference; out AMessage: string): TReferenceMatch;
 var
-  P, Q: Integer;
+  P, Q, WordLen: Integer;
   Lower, Name, Rest, PartName: string;
   Found: Boolean;
 begin
@@ -71,7 +85,7 @@ begin
   P := Pos('.', AInner);
   while P > 0 do
   begin
-    if (Copy(Lower, P + 1, 8) = 'request.') or (Copy(Lower, P + 1, 9) = 'response.') then
+    if ScopeWordLength(Lower, P) > 0 then
     begin
       Name := Copy(AInner, 1, P - 1);
       if (Name <> '') and (AFile.FindEndpoint(Name) <> nil) then
@@ -86,15 +100,17 @@ begin
     Exit;
 
   ARef.RequestName := Name;
-  if Copy(Lower, P + 1, 8) = 'request.' then
-  begin
-    ARef.Scope := rsRequest;
-    Rest := Copy(AInner, P + 9, MaxInt);
-  end
+  WordLen := ScopeWordLength(Lower, P);
+  if WordLen = 7 then
+    ARef.Scope := rsRequest
   else
-  begin
     ARef.Scope := rsResponse;
-    Rest := Copy(AInner, P + 10, MaxInt);
+  Rest := Copy(AInner, P + WordLen + 2, MaxInt);
+  if Rest = '' then
+  begin
+    Result := rmInvalid;
+    AMessage := Format('Missing part in reference to "%s" (expected body or headers)', [Name]);
+    Exit;
   end;
 
   Q := Pos('.', Rest);

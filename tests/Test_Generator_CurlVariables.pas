@@ -63,7 +63,7 @@ end;
 procedure DynamicVariableIsExportedEmptyWithWarning;
 var W: Integer;
 begin
-  AssertTrue(Pos('t=''''', Convert(Lines(['@t = {{login.response.body.$.id}}']), ctPosixShell, True, W)) > 0);
+  AssertTrue(Pos('t=''''', Convert(Lines(['@t = {{login.response.body.$.id}}', '# @name login', 'GET http://x']), ctPosixShell, True, W)) > 0);
   AssertEqualsInt(1, W);
 end;
 
