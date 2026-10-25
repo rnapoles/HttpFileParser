@@ -1,7 +1,9 @@
 { DumpHttpFile - loads the .http file given as the first argument and dumps
   what the parser understood: variables, endpoints and parse errors.
 
-  Usage:  DumpHttpFile <file.http>
+  Usage:  DumpHttpFile <file.http> [--demo]
+  --demo  registers the object "app" and a stored response for the request
+          "login" so the expressions of examples/features.http are resolved
   Exit code: 0 = parsed cleanly, 1 = parse errors, 2 = usage / I/O error }
 program DumpHttpFile;
 
@@ -10,8 +12,47 @@ program DumpHttpFile;
 
 uses
   SysUtils,
+  Classes,
   HttpFileAST,
+  HttpFileResponses,
   HttpFileParser;
+
+type
+  { Any object with published properties can be registered; no wrapper code. }
+  TDemoApp = class(TPersistent)
+  private
+    FName: string;
+    FVersion: string;
+    FEnvironment: string;
+  public
+    constructor Create;
+  published
+    property Name: string read FName;
+    property Version: string read FVersion;
+    property Environment: string read FEnvironment;
+  end;
+
+constructor TDemoApp.Create;
+begin
+  inherited Create;
+  FName := 'demo-client';
+  FVersion := '1.2.3';
+  FEnvironment := 'staging';
+end;
+
+procedure RegisterDemo(AParser: THttpFileParser; AApp: TDemoApp);
+var
+  Response: THttpResponse;
+begin
+  AParser.Scripting.RegisterObject('app', AApp);
+  // what an HTTP client would store after executing the "login" request
+  Response := AParser.Responses.Put('login');
+  Response.StatusCode := 200;
+  Response.AddHeader('X-AuthToken', 'token-123');
+  Response.Body :=
+    '{"payload":{"accessToken":"at-456","user":{"id":7,"name":"Ann"},' +
+    '"roles":["admin","dev"]}}';
+end;
 
 function Indent(const AText, APad: string): string;
 begin
@@ -81,11 +122,12 @@ end;
 
 var
   Parser: THttpFileParser;
+  Demo: TDemoApp;
   I: Integer;
 begin
   if ParamCount < 1 then
   begin
-    WriteLn('Usage: DumpHttpFile <file.http>');
+    WriteLn('Usage: DumpHttpFile <file.http> [--demo]');
     Halt(2);
   end;
   if not FileExists(ParamStr(1)) then
@@ -94,8 +136,14 @@ begin
     Halt(2);
   end;
 
+  Demo := nil;
   Parser := THttpFileParser.CreateFromFile(ParamStr(1));
   try
+    if (ParamCount >= 2) and SameText(ParamStr(2), '--demo') then
+    begin
+      Demo := TDemoApp.Create;
+      RegisterDemo(Parser, Demo); // before the first access: parsing is lazy
+    end;
     WriteLn('FILE ', ParamStr(1));
     WriteLn;
     DumpVariables(Parser.HttpFile);
@@ -108,5 +156,6 @@ begin
       ExitCode := 1;
   finally
     Parser.Free;
+    If Assigned(Demo) then FreeAndNil(Demo);
   end;
 end.

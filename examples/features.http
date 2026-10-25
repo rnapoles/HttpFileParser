@@ -1,0 +1,68 @@
+# Feature tour for HttpFileParser.
+#
+#   DumpHttpFile examples/features.http          plain parse: response references and
+#                                                registered objects stay as written
+#   DumpHttpFile examples/features.http --demo   the demo host registers the "app" object
+#                                                and a stored "login" response, so every
+#                                                expression below is resolved
+
+### 1. File variables and built-in functions
+@baseUrl = https://api.example.com
+@apiUrl = {{baseUrl}}/v1
+@requestId = {{$guid}}
+@issuedAt = {{$timestamp}}
+
+### 2. Registered objects (RTTI)
+# The host calls Parser.Scripting.RegisterObject('app', SomeObject); every published
+# property can then be read with {{app.Property}} (names are case-insensitive).
+@appName = {{app.Name}}
+@appVersion = {{app.Version}}
+
+### 3. Login - its response is used by the requests below
+# @name login
+POST {{apiUrl}}/auth/login
+Content-Type: application/json
+X-Request-Id: {{requestId}}
+X-Client: {{app.Name}}/{{app.Version}}
+
+{
+  "user": "demo",
+  "password": "secret",
+  "environment": "{{app.Environment}}",
+  "issuedAt": {{issuedAt}}
+}
+
+### 4. Response references: requestName.response.(headers|body).selector
+# The header name is case-insensitive. A body selector is a JSONPath ($...) or * (whole body).
+# Until the host stores the response of "login", these stay exactly as written.
+@authToken = {{login.response.headers.x-authtoken}}
+@accessToken = {{login.response.body.$.payload.accessToken}}
+@userId = {{login.response.body.$.payload.user.id}}
+
+# @name getUser
+GET {{apiUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+X-Auth: {{authToken}}
+
+### 5. Several matches become a JSON array, * is the whole body
+# @name audit
+POST {{apiUrl}}/audit
+Content-Type: application/json
+
+{
+  "roles": {{login.response.body.$.payload.roles[*]}},
+  "loginResponse": {{login.response.body.*}}
+}
+
+### 6. Request scope: read values from another request of this file
+# @name echoUser
+GET {{apiUrl}}/echo/{{login.request.body.$.user}}
+X-Prev-Auth: {{getUser.request.headers.Authorization}}
+X-Login-Content-Type: {{login.request.headers.content-type}}
+
+### 7. Body read from a file
+# @name upload
+POST {{apiUrl}}/upload
+Content-Type: application/xml
+
+< ./payload.xml # only valid here

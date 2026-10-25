@@ -55,3 +55,5 @@ a request: `Parser.Responses.Put('login')` (set `Body`, `AddHeader`), then `Pars
     Parser.Scripting.RegisterObject('app', MyConfig);   // {{app.BaseUrl}}  {{app.Server.Port}}
 
 Published properties are read through RTTI (Delphi: derive from `TPersistent` or use `{$M+}`).
+
+Feature tour: `examples/features.http` (run `DumpHttpFile examples/features.http --demo`).
