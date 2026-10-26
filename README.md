@@ -14,7 +14,7 @@ Zero-dependency parser for `.http` / `.rest` files. Delphi 12+ and Free Pascal 3
 | `HttpFileResponseParser` | raw HTTP response parser (`THttpResponseParser`) and saved-responses loader (`THttpResponseFileLoader`) |
 | `HttpFileExecutor` | `IRequestExecutor` + abstract `TRequestExecutor` (check, build message, `DoSend`, store, re-parse); one subclass per transport |
 | `HttpFileResponseBuilder` | transport neutral collector: header lines + body chunks -> `THttpResponse` |
-| `CurlRequestExecutor` | `TCurlRequestExecutor` (libcurl through `src/libcurl.pas`, GPL-3.0); needs libcurl at run time |
+| `CurlRequestExecutor` | `TCurlRequestExecutor` (libcurl through the `libcurl` unit in `src/libcurl/`); needs libcurl at run time |
 | `HttpFileSelectors` | value extraction from bodies (`*` and JSONPath through `TJSONPath`; XPath not supported yet) |
 | `HttpFileScripting` | RTTI registry of object instances readable from expressions |
 | `jsonpath/` | the JSONPath units (`src/jsonpath`, add to the unit search path) |
@@ -79,3 +79,12 @@ load with `THttpResponseFileLoader.LoadFromFile(file, Parser.Responses)`.
 Run a file against real servers: `sh build/build_run_fpc.sh && build/out/RunHttpFile examples/features.http`
 (`TCurlRequestExecutor.Create(Parser)`; options `FollowRedirects`, `TimeoutSeconds`, `VerifyTls`, `UserAgent`).
 
+## Linux check with Docker
+
+    docker compose up -d --build                         # idle container (sleep infinity, bash)
+    docker compose exec dev bash build/check_linux.sh    # build everything + unit tests + end-to-end run
+    docker compose exec dev bash                         # interactive shell
+    docker compose down
+
+On Linux/macOS hosts run `export HOST_UID=$(id -u) HOST_GID=$(id -g)` before `up --build` so the files
+written to the mounted project belong to you.

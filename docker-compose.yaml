@@ -1,0 +1,23 @@
+# Usage:
+#   docker compose up -d --build                         start the idle container
+#   docker compose exec dev bash                         interactive bash
+#   docker compose exec dev bash build/check_linux.sh    build everything and run all checks
+#   docker compose down                                  stop and remove it
+# On Linux/macOS hosts: export HOST_UID=$(id -u) HOST_GID=$(id -g) before "up --build".
+services:
+  dev:
+    build:
+      context: .
+      args:
+        HOST_UID: ${HOST_UID:-1000}
+        HOST_GID: ${HOST_GID:-1000}
+    image: httpfileparser-dev
+    container_name: httpfileparser-dev
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    environment:
+      SHELL: /bin/bash
+    command: ["sleep", "infinity"]
+    tty: true
+    stdin_open: true

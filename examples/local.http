@@ -1,0 +1,13 @@
+# Two chained requests against build/test_server.py (port 8099).
+# getUser uses the id from the body and the token from a header of the login response.
+
+# @name login
+POST http://127.0.0.1:8099/login
+Content-Type: application/json
+
+{"user":"demo"}
+
+### Get the user
+# @name getUser
+GET http://127.0.0.1:8099/users/{{login.response.body.$.id}}
+Authorization: Bearer {{login.response.headers.X-AuthToken}}

@@ -1,0 +1,7 @@
+build/out/
+.git/
+*.o
+*.ppu
+*.a
+*.exe
+*.dcu
