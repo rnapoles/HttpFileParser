@@ -1,0 +1,58 @@
+@baseUrl = https://jsonplaceholder.typicode.com
+@userId = 1
+
+# "Get All Posts" returns an ARRAY, so $[0].id is its first element
+@firstPostId = {{getPosts.response.body.$[0].id}}
+
+### Get All Posts
+# @name getPosts
+GET {{baseUrl}}/posts
+Accept: application/json
+
+### Get Single Post
+# "Get Single Post" returns ONE OBJECT: use $.id (not $[0].id)
+# @name getPost
+GET {{baseUrl}}/posts/{{userId}}
+Accept: application/json
+
+### Get Post Comments
+# @name getPostComments
+GET {{baseUrl}}/posts/{{firstPostId}}/comments
+Accept: application/json
+
+### Create New Post
+# @name createPost
+POST {{baseUrl}}/posts
+Content-Type: application/json
+
+{
+  "title": "Test Post from HTTP Client",
+  "body": "This is a test post created using the REST client",
+  "userId": {{userId}}
+}
+
+### Update Post
+PUT {{baseUrl}}/posts/1
+Content-Type: application/json
+
+{
+  "id": 1,
+  "title": "Updated Title",
+  "body": "Updated content",
+  "userId": {{userId}}
+}
+
+### Delete Post
+DELETE {{baseUrl}}/posts/1
+
+### Get Users
+GET {{baseUrl}}/users
+Accept: application/json
+
+### Get User Albums
+GET {{baseUrl}}/users/{{userId}}/albums
+Accept: application/json
+
+### Get Todos
+GET {{baseUrl}}/todos?userId={{userId}}
+Accept: application/json

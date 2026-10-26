@@ -2,7 +2,8 @@
 
   IRequestExecutor is what callers depend on. TRequestExecutor is the template:
   for each request it
-    1. checks that every response the request refers to is already stored
+    1. checks that every response the request refers to is stored and that
+       its selector matched (the error says which of the two failed)
     2. builds a transport neutral THttpRequestMessage from the endpoint
     3. hands it to DoSend (the only method a concrete executor implements)
     4. stores the response under the request name (Parser.Responses)
@@ -176,13 +177,37 @@ begin
 end;
 
 procedure TRequestExecutor.EnsureResolved(AEndpoint: TEndpoint);
-  procedure Check(const AWhere, AText: string);
+  function ReasonFor(const ARaw: string): string;
+  var
+    I: Integer;
   begin
-    if HasRequestReference(FParser.HttpFile, AText) then
+    Result := '';
+    for I := 0 to FParser.Errors.Count - 1 do
+      if (FParser.Errors[I].Rule = 'RequestReference') and (FParser.Errors[I].Token = ARaw) then
+      begin
+        Result := FParser.Errors[I].Message;
+        Exit;
+      end;
+  end;
+  procedure Check(const AWhere, AText: string);
+  var
+    Raw, Reason: string;
+    Ref: TRequestReference;
+  begin
+    if not FirstRequestReference(FParser.HttpFile, AText, Raw, Ref) then
+      Exit;
+    if FParser.Responses.Find(Ref.RequestName) = nil then
       raise ERequestExecutor.CreateFmt(
-        'Request "%s" (line %d) uses a response that is not available yet (%s: %s). ' +
-        'Execute the request it refers to first.',
-        [AEndpoint.Name, AEndpoint.Row, AWhere, AText]);
+        'Request "%s" (line %d) uses the response of "%s", which has not been executed yet ' +
+        '(%s: %s). Execute "%s" first.',
+        [AEndpoint.Name, AEndpoint.Row, Ref.RequestName, AWhere, AText, Ref.RequestName]);
+    // the response is stored, so the selector itself failed
+    Reason := ReasonFor(Raw);
+    if Reason = '' then
+      Reason := 'the selector did not match';
+    raise ERequestExecutor.CreateFmt(
+      'Request "%s" (line %d): %s could not be resolved although "%s" was executed: %s',
+      [AEndpoint.Name, AEndpoint.Row, Raw, Ref.RequestName, Reason]);
   end;
 var
   I: Integer;

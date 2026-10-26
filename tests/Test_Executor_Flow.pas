@@ -111,6 +111,38 @@ begin
   finally Rec.Free; P.Free; end;
 end;
 
+procedure FailedSelectorExplainsTheReason;
+var P: THttpFileParser; Stub: TStubRequestExecutor; Exec: IRequestExecutor; Msg: string;
+begin
+  P := NewParser(Lines(['@v = {{a.response.body.$[0].id}}', '# @name a', 'GET http://x/a', '',
+    '# @name b', 'GET http://x/b/{{v}}']));
+  try
+    Stub := TStubRequestExecutor.Create(P);
+    Exec := Stub;
+    Stub.Reply('http://x/a', 200, '{"id":1}'); // an object, not an array
+    Msg := '';
+    try Exec.ExecuteAll; except on E: ERequestExecutor do Msg := E.Message; end;
+    AssertTrue(Pos('matched nothing', Msg) > 0, Msg);
+    AssertTrue(Pos('although "a" was executed', Msg) > 0, Msg);
+    AssertTrue(Pos('not been executed', Msg) = 0, Msg);
+    AssertEqualsInt(1, Stub.SentCount);
+  finally P.Free; end;
+end;
+
+procedure MatchingSelectorChainsThroughAVariable;
+var P: THttpFileParser; Stub: TStubRequestExecutor; Exec: IRequestExecutor;
+begin
+  P := NewParser(Lines(['@v = {{a.response.body.$.id}}', '# @name a', 'GET http://x/a', '',
+    '# @name b', 'GET http://x/b/{{v}}']));
+  try
+    Stub := TStubRequestExecutor.Create(P);
+    Exec := Stub;
+    Stub.Reply('http://x/a', 200, '{"id":1}');
+    Exec.ExecuteAll;
+    AssertEqualsStr('http://x/b/1', Stub.Sent(1).Url);
+  finally P.Free; end;
+end;
+
 initialization
   RegisterTest('Executor.Flow', 'ExecuteAll chains responses', ExecuteAllChainsResponses);
   RegisterTest('Executor.Flow', 'executed requests are bound to the AST', ExecutedRequestsAreBoundToTheAst);
@@ -118,4 +150,6 @@ initialization
   RegisterTest('Executor.Flow', 'unknown request is rejected', UnknownRequestIsRejected);
   RegisterTest('Executor.Flow', 'unnamed request is executed but not stored', UnnamedRequestIsExecutedButNotStored);
   RegisterTest('Executor.Flow', 'event is raised after each request', EventIsRaisedAfterEachRequest);
+  RegisterTest('Executor.Flow', 'failed selector explains the reason', FailedSelectorExplainsTheReason);
+  RegisterTest('Executor.Flow', 'matching selector chains through a variable', MatchingSelectorChainsThroughAVariable);
 end.

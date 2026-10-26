@@ -34,6 +34,10 @@ type
 function MatchRequestReference(AFile: THttpFile; const AInner: string;
   out ARef: TRequestReference; out AMessage: string): TReferenceMatch;
 
+{ finds the first valid reference in AText; ARaw is its text with the braces }
+function FirstRequestReference(AFile: THttpFile; const AText: string;
+  out ARaw: string; out ARef: TRequestReference): Boolean;
+
 { True when AText contains at least one valid reference (resolved or not) }
 function HasRequestReference(AFile: THttpFile; const AText: string): Boolean;
 
@@ -151,13 +155,14 @@ begin
   Result := rmValid;
 end;
 
-function HasRequestReference(AFile: THttpFile; const AText: string): Boolean;
+function FirstRequestReference(AFile: THttpFile; const AText: string;
+  out ARaw: string; out ARef: TRequestReference): Boolean;
 var
   I, CloseAt: Integer;
   Inner, Msg: string;
-  Ref: TRequestReference;
 begin
   Result := False;
+  ARaw := '';
   I := 1;
   while I <= Length(AText) do
   begin
@@ -168,8 +173,9 @@ begin
         Exit;
       Inner := Trim(Copy(AText, I + 2, CloseAt - I - 2));
       if (Inner <> '') and (Inner[1] <> '$') and
-         (MatchRequestReference(AFile, Inner, Ref, Msg) = rmValid) then
+         (MatchRequestReference(AFile, Inner, ARef, Msg) = rmValid) then
       begin
+        ARaw := Copy(AText, I, CloseAt + 2 - I);
         Result := True;
         Exit;
       end;
@@ -178,6 +184,14 @@ begin
     else
       Inc(I);
   end;
+end;
+
+function HasRequestReference(AFile: THttpFile; const AText: string): Boolean;
+var
+  Raw: string;
+  Ref: TRequestReference;
+begin
+  Result := FirstRequestReference(AFile, AText, Raw, Ref);
 end;
 
 end.

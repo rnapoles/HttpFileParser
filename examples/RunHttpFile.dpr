@@ -21,6 +21,8 @@ uses
 
 type
   TProgressPrinter = class
+    Parser: THttpFileParser;
+    Shown: string;
     procedure Executed(ASender: TObject; const ARequestName: string; AResponse: THttpResponse);
   end;
 
@@ -30,6 +32,14 @@ var
   Name: string;
   I: Integer;
 begin
+  // problems found while resolving references after this response was stored
+  for I := 0 to Parser.Errors.Count - 1 do
+    if (Parser.Errors[I].Severity = hsError) and
+       (Pos(FormatParseError(Parser.Errors[I]), Shown) = 0) then
+    begin
+      WriteLn('diagnostic: ', FormatParseError(Parser.Errors[I]));
+      Shown := Shown + FormatParseError(Parser.Errors[I]) + #10;
+    end;
   Name := ARequestName;
   if Name = '' then
     Name := '(unnamed)';
@@ -67,6 +77,7 @@ begin
   RequestName := '';
   Parser := THttpFileParser.CreateFromFile(ParamStr(1));
   Printer := TProgressPrinter.Create;
+  Printer.Parser := Parser;
   try
     for I := 0 to Parser.Errors.Count - 1 do
       WriteLn('diagnostic: ', FormatParseError(Parser.Errors[I]));
