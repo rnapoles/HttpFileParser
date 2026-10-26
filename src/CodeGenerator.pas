@@ -12,6 +12,7 @@
 unit CodeGenerator;
 
 {$IFDEF FPC}{$MODE DELPHI}{$ENDIF}
+{$H+}{$X+}
 
 interface
 

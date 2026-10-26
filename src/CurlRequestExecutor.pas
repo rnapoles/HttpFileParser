@@ -1,7 +1,8 @@
-(* CurlRequestExecutor - TRequestExecutor on top of libcurl (libcurl.pas).
+(* CurlRequestExecutor - TRequestExecutor on top of libcurl (unit libcurl,
+  src/libcurl/libcurl.pas).
 
   Needs libcurl at run time (libcurl.dll / libcurl.so / libcurl.dylib) and
-  libcurl.pas on the unit search path.
+  the libcurl unit on the unit search path.
 
   Mapping of a THttpRequestMessage:
     method   GET: default, HEAD: NOBODY, others: CUSTOMREQUEST
@@ -78,17 +79,16 @@ begin
   THttpResponseBuilder(UserData).AddHeaderData(Buffer, Integer(Result));
 end;
 
-function CStringToText(AText: PChar): string;
+function CStringToText(AText: PUTF8Char): string;
+var
+  Bytes: RawByteString;
 begin
   if AText = nil then
     Result := ''
   else
   begin
-    {$IFDEF FPC}
-    Result := AText;
-    {$ELSE}
-    Result := UTF8ToString(PAnsiChar(Pointer(AText)));
-    {$ENDIF}
+    Bytes := PAnsiChar(Pointer(AText));
+    Result := BytesToText(Bytes);
   end;
 end;
 
@@ -97,7 +97,7 @@ type
   TCurlEasy = class
   private
     FHandle: PCURL;
-    FHeaderList: pcurl_slist;
+    FHeaderList: Pcurl_slist;
     FErrorBuffer: array[0..CURL_ERROR_SIZE] of AnsiChar;
     procedure Check(ACode: CURLcode);
   public
@@ -156,7 +156,7 @@ end;
 
 procedure TCurlEasy.AddHeader(const ALine: RawByteString);
 begin
-  FHeaderList := curl_slist_append(FHeaderList, PChar(Pointer(ALine)));
+  FHeaderList := curl_slist_append(FHeaderList, PUTF8Char(Pointer(ALine)));
   if FHeaderList = nil then
     raise ERequestExecutor.Create('libcurl: out of memory while adding a header');
 end;
@@ -174,7 +174,7 @@ begin
   begin
     Detail := CStringToText(curl_easy_strerror(Code));
     if FErrorBuffer[0] <> #0 then
-      Detail := Detail + ' - ' + CStringToText(PChar(@FErrorBuffer[0]));
+      Detail := Detail + ' - ' + CStringToText(PUTF8Char(@FErrorBuffer[0]));
     raise ERequestExecutor.CreateFmt('Request to %s failed: %s', [AUrl, Detail]);
   end;
 end;
@@ -195,13 +195,13 @@ var
 begin
   Version := UpperCase(AVersion);
   if Version = 'HTTP/1.0' then
-    AEasy.SetLong(CURLOPT_HTTP_VERSION, Ord(CURL_HTTP_VERSION_1_0))
+    AEasy.SetLong(CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0)
   else if Version = 'HTTP/1.1' then
-    AEasy.SetLong(CURLOPT_HTTP_VERSION, Ord(CURL_HTTP_VERSION_1_1))
+    AEasy.SetLong(CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1)
   else if (Version = 'HTTP/2') or (Version = 'HTTP/2.0') then
-    AEasy.SetLong(CURLOPT_HTTP_VERSION, Ord(CURL_HTTP_VERSION_2_0))
+    AEasy.SetLong(CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0)
   else if (Version = 'HTTP/3') or (Version = 'HTTP/3.0') then
-    AEasy.SetLong(CURLOPT_HTTP_VERSION, Ord(CURL_HTTP_VERSION_3));
+    AEasy.SetLong(CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_3);
 end;
 
 procedure ConfigureHeaders(AEasy: TCurlEasy; const ARequest: THttpRequestMessage;
