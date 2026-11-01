@@ -15,6 +15,8 @@ Zero-dependency parser for `.http` / `.rest` files. Delphi 12+ and Free Pascal 3
 | `HttpFileExecutor` | `IRequestExecutor` + abstract `TRequestExecutor` (check, build message, `DoSend`, store, re-parse); one subclass per transport |
 | `HttpFileResponseBuilder` | transport neutral collector: header lines + body chunks -> `THttpResponse` |
 | `CurlRequestExecutor` | `TCurlRequestExecutor` (libcurl through the `libcurl` unit in `src/libcurl/`); needs libcurl at run time |
+| `HttpFileLinter` | `THttpFileLinter` + rule classes (`THttpLintRule`): duplicate request names, unused variables, unresolved placeholders, circular references; warnings with positions |
+| `HttpFilePrinter` | `THttpFilePrinter`: canonical, stable .http text from a `THttpFile` (raw or resolved values, CRLF, alignment) |
 | `HttpFileSelectors` | value extraction from bodies (`*` and JSONPath through `TJSONPath`; XPath not supported yet) |
 | `HttpFileScripting` | RTTI registry of object instances readable from expressions |
 | `jsonpath/` | the JSONPath units (`src/jsonpath`, add to the unit search path) |
@@ -88,3 +90,11 @@ Run a file against real servers: `sh build/build_run_fpc.sh && build/out/RunHttp
 
 On Linux/macOS hosts run `export HOST_UID=$(id -u) HOST_GID=$(id -g)` before `up --build` so the files
 written to the mounted project belong to you.
+
+## Lint and format
+
+    LintHttpFile examples/features.http [--strict]    file:row:col: warning: message [rule]
+    FormatHttpFile examples/features.http [--resolved] [--crlf] [--write]
+
+`THttpFileLinter.Create(Parser.Functions, Parser.Scripting)` then `Lint(Parser.HttpFile, Diagnostics)`;
+add your own check with `AddRule(TMyRule.Create)` (derive from `THttpLintRule`).
