@@ -1,6 +1,5 @@
 @baseUrl = https://jsonplaceholder.typicode.com
 @userId = 1
-
 # "Get All Posts" returns an ARRAY, so $[0].id is its first element
 @firstPostId = {{getPosts.response.body.$[0].id}}
 

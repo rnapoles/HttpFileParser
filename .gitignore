@@ -85,3 +85,6 @@ __recovery/
 build/out/
 
 sample.*
+/sample.sh
+/sample.postman_collection.json
+/sample.postman_environment.json
