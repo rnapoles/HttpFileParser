@@ -28,13 +28,22 @@ P.Functions.RegisterFunction('upper', Upper, 1, 1); // {{$upper 'x'}}
 for E in P.HttpFile.Endpoints ... ; P.Errors[I].Row / .Column / .Message
 ```
 
-Build & run tests:
+## Build, test, run the samples
 
-    sh build/build_fpc.sh        (or build\build_fpc.bat / build\build_delphi.bat)
+| Windows | Linux / macOS (Free Pascal only) |
+|---|---|
+| `build.bat [fpc\|delphi\|all] [win32\|win64]` | `./build.sh` |
+| `test.bat [fpc\|delphi\|all] [win32\|win64]` | `./test.sh` |
+| `run-samples.bat [fpc\|delphi\|all] [win32\|win64]` | `./run-samples.sh` |
 
-Dump an `.http` file (sample program):
+Defaults on Windows: `all`, `win64`. `test` and `run-samples` build first. Output:
+`build\fpc-<platform>\bin` and `build\delphi-<platform>\bin` (units in `obj`, sample output in `samples`),
+on Linux `build/fpc-linux64/bin` (the platform is the native one).
 
-    sh build/build_dump_fpc.sh && build/out/DumpHttpFile examples/sample.http
+- Delphi: set `RSVARS` to the full path of `rsvars.bat`; it sets `BDS`, which the scripts use to find `dcc32.exe` / `dcc64.exe`.
+- FPC: `fpc` on the `PATH` (`win32` needs the i386 compiler, `win64` the x86_64 one).
+- `RunHttpFile` needs libcurl (`libcurl.dll` on the `PATH` or in the `bin` folder) and python for the local test server;
+  `run-samples.bat` skips that step when one is missing.
 
 ## Converters
 
@@ -47,7 +56,7 @@ Dump an `.http` file (sample program):
 
 Add a new target: derive from `TCodeGenerator`, override `Id`, `Description`, `DoGenerate`, and call `RegisterCodeGenerator` in `initialization`.
 
-    sh build/build_convert_fpc.sh && build/out/ConvertHttpFile examples/sample.http curl out
+    build\fpc-win64\bin\ConvertHttpFile examples\features.http curl out
 
 ## Request references and scripting objects
 
@@ -78,13 +87,13 @@ Each response is stored in `Parser.Responses`, the file is parsed again, and lat
 `login.response...`. Saved responses (`### name` / `# @name`, status line, headers, blank line, body)
 load with `THttpResponseFileLoader.LoadFromFile(file, Parser.Responses)`.
 
-Run a file against real servers: `sh build/build_run_fpc.sh && build/out/RunHttpFile examples/features.http`
+Run a file against real servers: `RunHttpFile examples/jsonplaceholder.http` (built by the scripts above)
 (`TCurlRequestExecutor.Create(Parser)`; options `FollowRedirects`, `TimeoutSeconds`, `VerifyTls`, `UserAgent`).
 
 ## Linux check with Docker
 
     docker compose up -d --build                         # idle container (sleep infinity, bash)
-    docker compose exec dev bash build/check_linux.sh    # build everything + unit tests + end-to-end run
+    docker compose exec dev bash build/check_linux.sh    # build.sh + test.sh + run-samples.sh
     docker compose exec dev bash                         # interactive shell
     docker compose down
 

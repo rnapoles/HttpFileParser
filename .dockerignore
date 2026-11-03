@@ -1,4 +1,5 @@
-build/out/
+build/fpc-*/
+build/delphi-*/
 .git/
 *.o
 *.ppu
