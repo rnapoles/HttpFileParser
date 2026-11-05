@@ -166,8 +166,8 @@ begin
     H := E.RequestHeaders[J];
     H.Value := Expand(H.RawValue, H.Row, H.ValueColumn);
   end;
-  if E.BodyFilePath <> '' then
-    E.BodyFilePath := Expand(E.BodyFilePath, E.BodyRow, E.BodyFileColumn)
+  if E.RawBodyFilePath <> '' then
+    E.BodyFilePath := Expand(E.RawBodyFilePath, E.BodyRow, E.BodyFileColumn)
   else
     E.RequestBody := Expand(E.RawRequestBody, E.BodyRow, 1);
   FEndpointState[AIndex] := 2;

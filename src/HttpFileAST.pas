@@ -15,6 +15,8 @@ type
   public
     Row: Integer;     // 1-based
     Column: Integer;  // 1-based
+    { moves the node (and what it contains) down or up by ADelta rows }
+    procedure ShiftRows(ADelta: Integer); virtual;
   end;
 
   THttpHeader = class(THttpNode)
@@ -56,12 +58,16 @@ type
     ResponseBody: string;     // filled from the response store (name must match)
     ResponseStatusCode: Integer; // 0 = no stored response
     ResponseStatusText: string;
-    BodyFilePath: string;     // set for "< path" bodies
+    BodyFilePath: string;     // set for "< path" bodies, resolved
+    RawBodyFilePath: string;  // the path as written
     UrlColumn: Integer;
     BodyRow: Integer;
     BodyFileColumn: Integer;
     constructor Create;
     destructor Destroy; override;
+    procedure ShiftRows(ADelta: Integer); override;
+    { forgets the stored response (status, body, headers) }
+    procedure ClearResponse;
     function AddRequestHeader: TRequestHeader;
     function AddResponseHeader: TResponseHeader;
     function FindRequestHeader(const AName: string): TRequestHeader;
@@ -75,14 +81,21 @@ type
   private
     FVariables: TVariableArray;
     FEndpoints: TEndpointArray;
+    FOwnsNodes: Boolean;
   public
+    constructor Create;
     destructor Destroy; override;
     function AddVariable: TVariable;
-    procedure AddEndpoint(AEndpoint: TEndpoint); // takes ownership
+    { adds a node that already exists; it is freed with the file only when OwnsNodes is True }
+    procedure AdoptVariable(AVariable: TVariable);
+    procedure AddEndpoint(AEndpoint: TEndpoint); // same ownership rule
     function FindVariable(const AName: string): TVariable; // last definition wins
     function FindEndpoint(const AName: string): TEndpoint;
     property Variables: TVariableArray read FVariables;
     property Endpoints: TEndpointArray read FEndpoints;
+    { True (default): the file frees its variables and endpoints.
+      False: it only lists nodes owned by someone else (incremental parsing). }
+    property OwnsNodes: Boolean read FOwnsNodes write FOwnsNodes;
   end;
 
   THttpSeverity = (hsError, hsWarning, hsInfo);
@@ -116,6 +129,8 @@ type
       const AMessage, AToken, ARule: string);
     procedure Clear;
     procedure SortByPosition;
+    { moves every entry down or up by ADelta rows }
+    procedure ShiftRows(ADelta: Integer);
     function CountOf(ASeverity: THttpSeverity): Integer;
     function HasErrors: Boolean;
     property Count: Integer read FCount;      // every entry, whatever its severity
@@ -144,6 +159,13 @@ procedure AdvancePosition(var ARow, AColumn: Integer; const AText: string);
 
 implementation
 
+{ THttpNode }
+
+procedure THttpNode.ShiftRows(ADelta: Integer);
+begin
+  Inc(Row, ADelta);
+end;
+
 { TEndpoint }
 
 constructor TEndpoint.Create;
@@ -161,6 +183,29 @@ begin
   for I := 0 to High(FResponseHeaders) do
     FResponseHeaders[I].Free;
   inherited Destroy;
+end;
+
+procedure TEndpoint.ShiftRows(ADelta: Integer);
+var
+  I: Integer;
+begin
+  inherited ShiftRows(ADelta);
+  if BodyRow > 0 then
+    Inc(BodyRow, ADelta);
+  for I := 0 to High(FRequestHeaders) do
+    FRequestHeaders[I].ShiftRows(ADelta);
+end;
+
+procedure TEndpoint.ClearResponse;
+var
+  I: Integer;
+begin
+  for I := 0 to High(FResponseHeaders) do
+    FResponseHeaders[I].Free;
+  FResponseHeaders := nil;
+  ResponseBody := '';
+  ResponseStatusCode := 0;
+  ResponseStatusText := '';
 end;
 
 function TEndpoint.AddRequestHeader: TRequestHeader;
@@ -192,15 +237,30 @@ end;
 
 { THttpFile }
 
+constructor THttpFile.Create;
+begin
+  inherited Create;
+  FOwnsNodes := True;
+end;
+
 destructor THttpFile.Destroy;
 var
   I: Integer;
 begin
-  for I := 0 to High(FVariables) do
-    FVariables[I].Free;
-  for I := 0 to High(FEndpoints) do
-    FEndpoints[I].Free;
+  if FOwnsNodes then
+  begin
+    for I := 0 to High(FVariables) do
+      FVariables[I].Free;
+    for I := 0 to High(FEndpoints) do
+      FEndpoints[I].Free;
+  end;
   inherited Destroy;
+end;
+
+procedure THttpFile.AdoptVariable(AVariable: TVariable);
+begin
+  SetLength(FVariables, Length(FVariables) + 1);
+  FVariables[High(FVariables)] := AVariable;
 end;
 
 function THttpFile.AddVariable: TVariable;
@@ -318,6 +378,17 @@ procedure THttpParseErrorList.Clear;
 begin
   FCount := 0;
   SetLength(FItems, 0);
+end;
+
+procedure THttpParseErrorList.ShiftRows(ADelta: Integer);
+var
+  I: Integer;
+begin
+  for I := 0 to FCount - 1 do
+  begin
+    Inc(FItems[I].Row, ADelta);
+    Inc(FItems[I].EndRow, ADelta);
+  end;
 end;
 
 procedure THttpParseErrorList.SortByPosition;

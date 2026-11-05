@@ -68,7 +68,8 @@ type
     function TryScanRequestLine(var AToken: THttpToken): Boolean;
     function TryScanHeader(var AToken: THttpToken): Boolean;
   public
-    constructor Create(const AInput: string);
+    { AFirstRow is the row number of the first line (used when lexing a part of a file) }
+    constructor Create(const AInput: string; AFirstRow: Integer = 1);
     { character primitives }
     function AtEnd: Boolean;
     function PeekChar(AOffset: Integer = 0): Char;
@@ -138,7 +139,7 @@ end;
 
 { THttpFileLexer }
 
-constructor THttpFileLexer.Create(const AInput: string);
+constructor THttpFileLexer.Create(const AInput: string; AFirstRow: Integer);
 begin
   inherited Create;
   FInput := AInput;
@@ -151,7 +152,7 @@ begin
   {$ENDIF}
   FLen := Length(FInput);
   FPos := 1;
-  FRow := 1;
+  FRow := AFirstRow;
   FCol := 1;
 end;
 

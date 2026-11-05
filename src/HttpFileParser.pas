@@ -35,18 +35,27 @@ uses
 
 type
   THttpFileParser = class
-  private
+  protected
     FInput: string;
+    FFile: THttpFile;
+    FErrors: THttpParseErrorList;
+    FParsed: Boolean;
+    { Syntax pass only: lexes and parses AText into AFile / AErrors; rows count
+      from AFirstRow. Nothing is resolved. }
+    procedure ParseSyntax(const AText: string; AFirstRow: Integer; AFile: THttpFile;
+      AErrors: THttpParseErrorList);
+    { second pass over the whole file: variables, functions, references, bound responses }
+    procedure Resolve;
+    procedure ReplaceHttpFile(AFile: THttpFile); // frees the current file, takes AFile (may be nil)
+    procedure FinishParse; // Resolve, sort the diagnostics, mark as parsed
+  private
     FLexer: THttpFileLexer;
     FToken: THttpToken;
     FTokenIndex: Integer;
-    FFile: THttpFile;
-    FErrors: THttpParseErrorList;
     FFunctions: THttpFunctionRegistry;
     FContext: THttpFunctionContext;
     FResponses: THttpResponseStore;
     FObjects: TScriptObjectRegistry;
-    FParsed: Boolean;
     FPendingName: string;
     FPendingTitle: string;
     function GetHttpFile: THttpFile;
@@ -73,13 +82,12 @@ type
     function ParseHeader(AEndpoint: TEndpoint): TRequestHeader;
     procedure ParseBody(AEndpoint: TEndpoint);
     procedure ParseScript;
-    procedure Resolve;
   public
     constructor Create(const AInput: string);
     constructor CreateFromFile(const AFileName: string);
     destructor Destroy; override;
     { Parses (again) the input. HttpFile / Errors call it on first access. }
-    procedure Parse;
+    procedure Parse; virtual;
     property HttpFile: THttpFile read GetHttpFile;
     property Errors: THttpParseErrorList read GetErrors;
     { register custom functions here before parsing }
@@ -173,21 +181,52 @@ begin
   Result := FErrors;
 end;
 
-procedure THttpFileParser.Parse;
+procedure THttpFileParser.ParseSyntax(const AText: string; AFirstRow: Integer;
+  AFile: THttpFile; AErrors: THttpParseErrorList);
+var
+  SavedFile: THttpFile;
+  SavedErrors: THttpParseErrorList;
 begin
-  FreeAndNil(FLexer);
-  FreeAndNil(FFile);
-  FErrors.Clear;
-  FPendingName := '';
-  FPendingTitle := '';
-  FTokenIndex := 0;
-  FFile := THttpFile.Create;
-  FLexer := THttpFileLexer.Create(FInput);
-  FToken := FLexer.NextToken;
-  ParseHttpFile;
+  SavedFile := FFile;
+  SavedErrors := FErrors;
+  FFile := AFile;
+  FErrors := AErrors;
+  try
+    FreeAndNil(FLexer);
+    FPendingName := '';
+    FPendingTitle := '';
+    FTokenIndex := 0;
+    FLexer := THttpFileLexer.Create(AText, AFirstRow);
+    FToken := FLexer.NextToken;
+    ParseHttpFile;
+  finally
+    FFile := SavedFile;
+    FErrors := SavedErrors;
+  end;
+end;
+
+procedure THttpFileParser.ReplaceHttpFile(AFile: THttpFile);
+begin
+  if FFile <> AFile then
+  begin
+    FFile.Free;
+    FFile := AFile;
+  end;
+end;
+
+procedure THttpFileParser.FinishParse;
+begin
   Resolve;
   FErrors.SortByPosition;
   FParsed := True;
+end;
+
+procedure THttpFileParser.Parse;
+begin
+  FErrors.Clear;
+  ReplaceHttpFile(THttpFile.Create);
+  ParseSyntax(FInput, 1, FFile, FErrors);
+  FinishParse;
 end;
 
 procedure THttpFileParser.Resolve;
@@ -249,7 +288,10 @@ begin
     Advance; // guarantee progress
   while not (FToken.Kind in [tkEOF, tkSeparator, tkMetaName, tkVariableDecl,
     tkRequestLine]) do
-    Advance;
+    if FToken.Kind = tkScript then
+      ParseScript // skips the whole script block, so it is never read as requests
+    else
+      Advance;
 end;
 
 { grammar }
@@ -455,6 +497,7 @@ begin
   if (First = Last) and (Lines[First].Kind = tkFileRef) then
   begin
     AEndpoint.BodyFilePath := Lines[First].Path;
+    AEndpoint.RawBodyFilePath := Lines[First].Path;
     AEndpoint.BodyFileColumn := Lines[First].PathCol;
     AEndpoint.RawRequestBody := Lines[First].Text;
     Exit;

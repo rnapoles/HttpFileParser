@@ -170,6 +170,7 @@ begin
   for I := 0 to High(AFile.Endpoints) do
   begin
     Endpoint := AFile.Endpoints[I];
+    Endpoint.ClearResponse; // the nodes may be bound more than once (incremental parsing)
     if Endpoint.Name = '' then
       Continue;
     Response := AStore.Find(Endpoint.Name);
